@@ -2,7 +2,7 @@
 image: nginx:latest  # Image for the deployment
 replicaCount: 1  # Number of replicas for the deployment
 servicePort: 80  # Port exposed by the service
-namespace: vv
+namespace: sample-app-namespace
 POD: sample-pod
 app: sample-app
 configMapData:  # Data for the ConfigMap

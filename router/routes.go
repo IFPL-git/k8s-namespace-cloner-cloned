@@ -1,11 +1,11 @@
 package router
 
 import (
+	"github.com/IFPL-git/k8s-namespace-cloner/controllers"
+	"github.com/IFPL-git/k8s-namespace-cloner/middlewares"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/venkatvghub/k8s-namespace-cloner/controllers"
-	"github.com/venkatvghub/k8s-namespace-cloner/middlewares"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 )
@@ -28,6 +28,7 @@ func InitializeRoutes(clientset *kubernetes.Clientset, dynamicClientSet *dynamic
 		v1.POST("/secrets/:secret", controllers.UpdateSecret)
 		v1.POST("/configmaps/:configmap", controllers.UpdateConfigMap)
 
+		v1.GET("/cohorts", controllers.GetCohorts)
 	}
 	// use ginSwagger middleware to serve the API docs
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

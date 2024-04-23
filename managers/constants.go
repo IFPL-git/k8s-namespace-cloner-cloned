@@ -1,10 +1,5 @@
 package managers
 
-import (
-	"fmt"
-	"sort"
-)
-
 const (
 	NS_CLONER_ANNOTATION              = "cloner.io/enabled"
 	TARGET_NS_ANNOTATION              = "cloner.io/source-namespace"
@@ -40,20 +35,3 @@ const (
 	  timeZone: "Europe/Rome
 	`
 )
-
-// Useless debugging function. Just a placeholder and not needed for actual work
-func prettyPrint(m map[string]string) {
-	// Get keys and sort them to ensure consistent order when printing
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Iterate over the sorted keys and print the key-value pairs
-	fmt.Println("{")
-	for _, k := range keys {
-		fmt.Printf("  %s: %s,\n", k, m[k])
-	}
-	fmt.Println("}")
-}

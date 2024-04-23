@@ -29,11 +29,11 @@ func getconfigmapforNS(clientset *kubernetes.Clientset, namespace string) (*v1.C
 		if errors.IsNotFound(err) {
 			// Namespace doesn't have CronJobs, return successfully
 			errStr := fmt.Sprintf("Namespace %s does not have any ConfigMaps\n", namespace)
-			log.Printf(errStr)
+			log.Print(errStr)
 			return nil, nil
 		} else {
 			// Error checking for CronJobs
-			log.Printf("Error checking for ConfigMaps:", err)
+			log.Print("Error checking for ConfigMaps:", err)
 			return configMaps, &Error{
 				Code:    http.StatusInternalServerError,
 				Message: err.Error(),
@@ -110,7 +110,7 @@ func getSecretsforNS(clientset *kubernetes.Clientset, namespace string) (*v1.Sec
 		if errors.IsNotFound(err) {
 			// Namespace doesn't have CronJobs, return successfully
 			errStr := fmt.Sprintf("Namespace %s does not have any Secrets\n", namespace)
-			log.Printf(errStr)
+			log.Print(errStr)
 			return nil, nil
 		} else {
 			// Error checking for CronJobs
@@ -191,7 +191,7 @@ func getDeploymentsForNS(clientset *kubernetes.Clientset, namespace string) (*ap
 		if errors.IsNotFound(err) {
 			// Namespace doesn't have CronJobs, return successfully
 			errStr := fmt.Sprintf("Namespace %s does not have any Deployments\n", namespace)
-			log.Printf(errStr)
+			log.Print(errStr)
 			return nil, nil
 		} else {
 			// Error checking for CronJobs
@@ -297,7 +297,7 @@ func CloneServices(clientset *kubernetes.Clientset, sourceNamespace, targetNames
 			return nil
 		} else {
 			// Error checking for CronJobs
-			log.Printf("Error checking for Services:", err)
+			log.Print("Error checking for Services:", err)
 			return &Error{
 				Code:    http.StatusInternalServerError,
 				Message: err.Error(),
@@ -550,10 +550,8 @@ func CloneJobs(clientset *kubernetes.Clientset, sourceNamespace, targetNamespace
 func hasStatefulSetUpdateFailure(statefulSet *appsv1.StatefulSet) bool {
 	// Implement logic to check for specific failure conditions in StatefulSet status
 	// Example:
-	if statefulSet.Status.UpdateRevision != statefulSet.Status.CurrentRevision {
-		return true
-	}
-	return false // Adjust based on your error detection criteria
+	return statefulSet.Status.UpdateRevision != statefulSet.Status.CurrentRevision
+	// Adjust based on your error detection criteria
 }
 
 func getStatefulSetFailureReason(statefulSet *appsv1.StatefulSet) string {
@@ -767,7 +765,7 @@ func CloneSeviceAccount(clientset *kubernetes.Clientset, sourceNamespace, target
 			if errors.IsNotFound(err) {
 				return &Error{
 					Code:    http.StatusBadRequest,
-					Message: fmt.Sprintf("", serviceAccount.Name, targetNamespace),
+					Message: fmt.Sprint("", serviceAccount.Name, targetNamespace),
 				}
 			} else {
 				return &Error{
@@ -934,7 +932,7 @@ func CloneNamespace(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.D
 
 	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
 		errStr := fmt.Sprintf("Error creating namespace %s: %v\n", targetNamespace, err)
-		log.Printf(errStr)
+		log.Print(errStr)
 		return &Error{
 			Code:    http.StatusInternalServerError,
 			Message: errStr,
@@ -942,7 +940,7 @@ func CloneNamespace(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.D
 	}
 
 	// Apply Kube Green Annotations to the entire namespace
-	errObj := applyKubeGreen(clientset, dynamicClientSet, targetNamespace)
+	errObj := applyKubeGreen(dynamicClientSet, targetNamespace)
 	if errObj != nil {
 		// Remove the Target Namespace
 		// TODO: Probably move the namespace deletion to a go routine for returning faster?
@@ -1144,7 +1142,7 @@ func findContainerIndex(deployment *appsv1.Deployment, containerName string) int
 }
 
 // Helper function to apply Kube Green annotations to a namespace
-func applyKubeGreen(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.DynamicClient, clonedNamespace string) *Error {
+func applyKubeGreen(dynamicClientSet *dynamic.DynamicClient, clonedNamespace string) *Error {
 	// Define the SleepInfo CR object
 	name := fmt.Sprintf("%s-sleepinfo", clonedNamespace)
 	unstructuredMap := map[string]interface{}{
