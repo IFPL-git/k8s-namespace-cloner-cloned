@@ -11,7 +11,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,10 +19,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var ClonedServiceTypes = []v1.ServiceType{corev1.ServiceTypeClusterIP, corev1.ServiceTypeNodePort, corev1.ServiceTypeExternalName}
+var ClonedServiceTypes = []corev1.ServiceType{corev1.ServiceTypeClusterIP, corev1.ServiceTypeNodePort, corev1.ServiceTypeExternalName}
 
-func getconfigmapforNS(clientset *kubernetes.Clientset, namespace string) (*v1.ConfigMapList, *Error) {
-	var configMaps *v1.ConfigMapList
+func getconfigmapforNS(clientset *kubernetes.Clientset, namespace string) (*corev1.ConfigMapList, *Error) {
+	var configMaps *corev1.ConfigMapList
 	configMaps, err := clientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -66,7 +65,7 @@ func CloneConfigMap(clientset *kubernetes.Clientset, sourceNamespace, targetName
 		annotations[TARGET_NS_ANNOTATION] = sourceNamespace
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_CM_ANNOTATION] = configMap.Name
-		_, err = clientset.CoreV1().ConfigMaps(targetNamespace).Create(context.TODO(), &v1.ConfigMap{
+		_, err = clientset.CoreV1().ConfigMaps(targetNamespace).Create(context.TODO(), &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        configMap.Name,
 				Annotations: annotations,
@@ -103,8 +102,8 @@ func CloneConfigMap(clientset *kubernetes.Clientset, sourceNamespace, targetName
 	return nil
 }
 
-func getSecretsforNS(clientset *kubernetes.Clientset, namespace string) (*v1.SecretList, *Error) {
-	var secrets *v1.SecretList
+func getSecretsforNS(clientset *kubernetes.Clientset, namespace string) (*corev1.SecretList, *Error) {
+	var secrets *corev1.SecretList
 	secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -148,7 +147,7 @@ func CloneSecret(clientset *kubernetes.Clientset, sourceNamespace, targetNamespa
 		annotations[TARGET_NS_ANNOTATION] = sourceNamespace
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_SECRET_ANNOTATION] = secret.Name
-		_, err = clientset.CoreV1().Secrets(targetNamespace).Create(context.TODO(), &v1.Secret{
+		_, err = clientset.CoreV1().Secrets(targetNamespace).Create(context.TODO(), &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        secret.Name,
 				Namespace:   targetNamespace,
@@ -321,7 +320,7 @@ func CloneServices(clientset *kubernetes.Clientset, sourceNamespace, targetNames
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_SERVICE_ANNOTATION] = service.Name
 
-		_, err = clientset.CoreV1().Services(targetNamespace).Create(context.TODO(), &v1.Service{
+		_, err = clientset.CoreV1().Services(targetNamespace).Create(context.TODO(), &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        service.Name,
 				Namespace:   targetNamespace,
@@ -745,7 +744,7 @@ func CloneSeviceAccount(clientset *kubernetes.Clientset, sourceNamespace, target
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_SA_ANNOTATION] = serviceAccount.Name
 
-		_, err = clientset.CoreV1().ServiceAccounts(targetNamespace).Create(context.TODO(), &v1.ServiceAccount{
+		_, err = clientset.CoreV1().ServiceAccounts(targetNamespace).Create(context.TODO(), &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        serviceAccount.Name,
 				Namespace:   targetNamespace,
@@ -923,7 +922,7 @@ func CloneNamespace(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.D
 	annotations[TARGET_NS_ANNOTATION] = sourceNamespace
 	annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 
-	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        targetNamespace,
 			Annotations: annotations,
