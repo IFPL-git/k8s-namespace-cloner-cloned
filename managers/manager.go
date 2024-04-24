@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 )
@@ -53,11 +56,19 @@ type DeploymentDetail struct {
 	POD        string      `json:"pod"`
 	App        string      `json:"app"`
 	Containers []Container `json:"containers"`
-	Replicas   *int32      `json:replicas`
+	Replicas   *int32      `json:"replicas"`
 }
 
 type DeploymentContainers struct {
 	Deployments []DeploymentDetail `json:"deployments"`
+}
+
+type CohortService struct {
+	Namespace string `yaml:"namespace"`
+}
+
+type CohortFile struct {
+	Services []CohortService `yaml:"services"`
 }
 
 func GetNS(clientset *kubernetes.Clientset) ([]map[string]string, *Error) {
@@ -138,7 +149,7 @@ func GetDeploymentYaml(clientset *kubernetes.Clientset, namespace string) (Deplo
 	for _, deployment := range deployments.Items {
 		// Initialize the inner map for each deployment
 		// Only allow deployments that are cloned by this system using the annotations set
-		errObj := validateDeploymentEliblity(clientset, &deployment)
+		errObj := validateDeploymentEliblity(&deployment)
 		if errObj != nil {
 			continue
 		}
@@ -179,7 +190,7 @@ func GetSecretYaml(clientset *kubernetes.Clientset, namespace string) ([]Secret,
 
 	for _, secret := range secrets.Items {
 		proceed := true
-		errObj := validateSecretEliblity(clientset, &secret)
+		errObj := validateSecretEliblity(&secret)
 		if errObj != nil {
 			continue
 		}
@@ -237,7 +248,7 @@ func GetConfigMapYaml(clientset *kubernetes.Clientset, namespace string) ([]Conf
 	configMapData := make([]ConfigMap, 0)
 	for _, configMap := range configMaps.Items {
 		proceed := true
-		errObj := validateConfigMapEliblity(clientset, &configMap)
+		errObj := validateConfigMapEliblity(&configMap)
 		//log.Printf("Error:%v\n", errObj)
 		if errObj != nil {
 			continue
@@ -285,7 +296,7 @@ func PatchDeploymentImage(clientset *kubernetes.Clientset, namespace string, dep
 	}
 
 	// Only allow patching deployments that are cloned by this system using the annotations set
-	errObj := validateDeploymentEliblity(clientset, deployment)
+	errObj := validateDeploymentEliblity(deployment)
 	if errObj != nil {
 		return errObj
 	}
@@ -346,7 +357,7 @@ func PatchSecret(clientset *kubernetes.Clientset, namespace string, secretName s
 			Message: err.Error(),
 		}
 	}
-	errObj := validateSecretEliblity(clientset, secret)
+	errObj := validateSecretEliblity(secret)
 	if errObj != nil {
 		return errObj
 	}
@@ -405,7 +416,7 @@ func PatchConfigMap(clientset *kubernetes.Clientset, namespace string, configMap
 		}
 	}
 
-	errObj := validateConfigMapEliblity(clientset, configMap)
+	errObj := validateConfigMapEliblity(configMap)
 	if errObj != nil {
 		return errObj
 	}
@@ -442,4 +453,43 @@ func PatchConfigMap(clientset *kubernetes.Clientset, namespace string, configMap
 		}
 	}
 	return nil
+}
+
+func GetCohorts() (map[string][]string, error) {
+	cohortNamespaces := make(map[string][]string)
+
+	cohortsFolder := "./cohorts"
+	err := filepath.Walk(cohortsFolder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() && (filepath.Ext(info.Name()) == ".yaml" || filepath.Ext(info.Name()) == ".yml") {
+			file, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			var cohortFile CohortFile
+			if err := yaml.Unmarshal(file, &cohortFile); err != nil {
+				return err
+			}
+
+			var namespacesInFile []string
+			for _, service := range cohortFile.Services {
+				namespacesInFile = append(namespacesInFile, service.Namespace)
+			}
+
+			filename := strings.Split(filepath.Base(path), ".")[0]
+			cohortNamespaces[filename] = namespacesInFile
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return cohortNamespaces, err
+	}
+
+	return cohortNamespaces, nil
 }

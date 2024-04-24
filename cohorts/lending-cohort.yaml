@@ -1,0 +1,33 @@
+services: 
+  - name: comms 
+    namespace: comms-svc
+    environment: ""
+    hodor_auth_required: false
+    Entity: QFPL 
+  - name: lms 
+    namespace: lms-svc 
+    depends_on: 
+    - Sahukar 
+    - mmp
+    environment: 
+    # https & http needs to be handled 
+    - SAHUKAR_HOST:  http://test-sahukar-service.sahukar-svc.svc.cluster.local/sahukar/api/v1/
+    - MMP_BASEQUAD_HOST: http://test-mmp-svc-service.mmp-svc.svc.cluster.local
+  - name: mmp 
+    namespace: mmp-svc
+    depends_on: 
+    - Sahukar 
+    - LMS 
+    environment: 
+    # https & http needs to be handled 
+    - LMS_SVC_BASEURL:  http://test-sahukar-service.sahukar-svc.svc.cluster.local/sahukar/api/v1/
+    - SAHUKAR_SVC_BASEURL: http://test-mmp-svc-service.mmp-svc.svc.cluster.local
+  - name: sahukar 
+    namespace: sahukar-svc
+    depends_on: 
+    - Sahukar 
+    - LMS 
+    environment: 
+    # https & http needs to be handled 
+    - COMMS_SVC_HOST:  http://test-sahukar-service.sahukar-svc.svc.cluster.local/sahukar/api/v1/
+    - SAHUKAR_SVC_BASEURL: http://test-mmp-svc-service.mmp-svc.svc.cluster.local

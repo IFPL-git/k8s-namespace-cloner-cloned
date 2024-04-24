@@ -3,7 +3,6 @@ package managers
 import (
 	"context"
 	"log"
-
 	"net/http"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -52,7 +51,7 @@ func validateSourceNamespace(clientset *kubernetes.Clientset, sourceNamespace st
 	return nil
 }
 
-func validateDeploymentEliblity(clientset *kubernetes.Clientset, deployment *appsv1.Deployment) *Error {
+func validateDeploymentEliblity(deployment *appsv1.Deployment) *Error {
 	// Check if the deployment is already cloned
 	annotations := deployment.ObjectMeta.Annotations
 	if annotations != nil {
@@ -74,7 +73,7 @@ func validateDeploymentEliblity(clientset *kubernetes.Clientset, deployment *app
 	return nil
 }
 
-func validateSecretEliblity(clientset *kubernetes.Clientset, secret *v1.Secret) *Error {
+func validateSecretEliblity(secret *v1.Secret) *Error {
 	// Check if the deployment is already cloned
 	annotations := secret.ObjectMeta.Annotations
 	if annotations != nil {
@@ -96,7 +95,7 @@ func validateSecretEliblity(clientset *kubernetes.Clientset, secret *v1.Secret) 
 	return nil
 }
 
-func validateConfigMapEliblity(clientset *kubernetes.Clientset, configMap *v1.ConfigMap) *Error {
+func validateConfigMapEliblity(configMap *v1.ConfigMap) *Error {
 	// Check if the deployment is already cloned
 	//annotations := configMap.Annotations
 	annotations := configMap.ObjectMeta.Annotations

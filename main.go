@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
+	_ "github.com/IFPL-git/k8s-namespace-cloner/docs"
+	"github.com/IFPL-git/k8s-namespace-cloner/router"
 	"github.com/gin-gonic/gin"
-	_ "github.com/venkatvghub/k8s-namespace-cloner/docs"
-	"github.com/venkatvghub/k8s-namespace-cloner/router"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -18,8 +18,6 @@ import (
 // @title Kubernetes Namespace Cloner API
 // @version 3.0.0
 // @description Kubernetes Namespace Cloner API URI:<br>&nbsp;&nbsp;https://{nw-server-hostname}:8080/api/v1<br><br>
-// @contact name "VV"
-// @license name "No Copyrights" url "https://www.example.com"
 // @host localhost:8080
 // @BasePath /api/v1
 // @schemes http https
@@ -68,9 +66,8 @@ func main() {
 	}
 
 	r := router.InitializeRoutes(clientset, dynamicClient)
-	log.Printf("Startng server at port 8080\n")
+	log.Print("Startng server at port 8080\n")
 	r.Run(":8080")
-
 }
 
 // Utility function to get the kubeconfig path

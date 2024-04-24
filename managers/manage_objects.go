@@ -11,7 +11,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,20 +19,20 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var ClonedServiceTypes = []v1.ServiceType{corev1.ServiceTypeClusterIP, corev1.ServiceTypeNodePort, corev1.ServiceTypeExternalName}
+var ClonedServiceTypes = []corev1.ServiceType{corev1.ServiceTypeClusterIP, corev1.ServiceTypeNodePort, corev1.ServiceTypeExternalName}
 
-func getconfigmapforNS(clientset *kubernetes.Clientset, namespace string) (*v1.ConfigMapList, *Error) {
-	var configMaps *v1.ConfigMapList
+func getconfigmapforNS(clientset *kubernetes.Clientset, namespace string) (*corev1.ConfigMapList, *Error) {
+	var configMaps *corev1.ConfigMapList
 	configMaps, err := clientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Namespace doesn't have CronJobs, return successfully
 			errStr := fmt.Sprintf("Namespace %s does not have any ConfigMaps\n", namespace)
-			log.Printf(errStr)
+			log.Print(errStr)
 			return nil, nil
 		} else {
 			// Error checking for CronJobs
-			log.Printf("Error checking for ConfigMaps:", err)
+			log.Print("Error checking for ConfigMaps:", err)
 			return configMaps, &Error{
 				Code:    http.StatusInternalServerError,
 				Message: err.Error(),
@@ -66,7 +65,7 @@ func CloneConfigMap(clientset *kubernetes.Clientset, sourceNamespace, targetName
 		annotations[TARGET_NS_ANNOTATION] = sourceNamespace
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_CM_ANNOTATION] = configMap.Name
-		_, err = clientset.CoreV1().ConfigMaps(targetNamespace).Create(context.TODO(), &v1.ConfigMap{
+		_, err = clientset.CoreV1().ConfigMaps(targetNamespace).Create(context.TODO(), &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        configMap.Name,
 				Annotations: annotations,
@@ -103,14 +102,14 @@ func CloneConfigMap(clientset *kubernetes.Clientset, sourceNamespace, targetName
 	return nil
 }
 
-func getSecretsforNS(clientset *kubernetes.Clientset, namespace string) (*v1.SecretList, *Error) {
-	var secrets *v1.SecretList
+func getSecretsforNS(clientset *kubernetes.Clientset, namespace string) (*corev1.SecretList, *Error) {
+	var secrets *corev1.SecretList
 	secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Namespace doesn't have CronJobs, return successfully
 			errStr := fmt.Sprintf("Namespace %s does not have any Secrets\n", namespace)
-			log.Printf(errStr)
+			log.Print(errStr)
 			return nil, nil
 		} else {
 			// Error checking for CronJobs
@@ -148,7 +147,7 @@ func CloneSecret(clientset *kubernetes.Clientset, sourceNamespace, targetNamespa
 		annotations[TARGET_NS_ANNOTATION] = sourceNamespace
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_SECRET_ANNOTATION] = secret.Name
-		_, err = clientset.CoreV1().Secrets(targetNamespace).Create(context.TODO(), &v1.Secret{
+		_, err = clientset.CoreV1().Secrets(targetNamespace).Create(context.TODO(), &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        secret.Name,
 				Namespace:   targetNamespace,
@@ -191,7 +190,7 @@ func getDeploymentsForNS(clientset *kubernetes.Clientset, namespace string) (*ap
 		if errors.IsNotFound(err) {
 			// Namespace doesn't have CronJobs, return successfully
 			errStr := fmt.Sprintf("Namespace %s does not have any Deployments\n", namespace)
-			log.Printf(errStr)
+			log.Print(errStr)
 			return nil, nil
 		} else {
 			// Error checking for CronJobs
@@ -297,7 +296,7 @@ func CloneServices(clientset *kubernetes.Clientset, sourceNamespace, targetNames
 			return nil
 		} else {
 			// Error checking for CronJobs
-			log.Printf("Error checking for Services:", err)
+			log.Print("Error checking for Services:", err)
 			return &Error{
 				Code:    http.StatusInternalServerError,
 				Message: err.Error(),
@@ -321,7 +320,7 @@ func CloneServices(clientset *kubernetes.Clientset, sourceNamespace, targetNames
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_SERVICE_ANNOTATION] = service.Name
 
-		_, err = clientset.CoreV1().Services(targetNamespace).Create(context.TODO(), &v1.Service{
+		_, err = clientset.CoreV1().Services(targetNamespace).Create(context.TODO(), &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        service.Name,
 				Namespace:   targetNamespace,
@@ -550,10 +549,8 @@ func CloneJobs(clientset *kubernetes.Clientset, sourceNamespace, targetNamespace
 func hasStatefulSetUpdateFailure(statefulSet *appsv1.StatefulSet) bool {
 	// Implement logic to check for specific failure conditions in StatefulSet status
 	// Example:
-	if statefulSet.Status.UpdateRevision != statefulSet.Status.CurrentRevision {
-		return true
-	}
-	return false // Adjust based on your error detection criteria
+	return statefulSet.Status.UpdateRevision != statefulSet.Status.CurrentRevision
+	// Adjust based on your error detection criteria
 }
 
 func getStatefulSetFailureReason(statefulSet *appsv1.StatefulSet) string {
@@ -747,7 +744,7 @@ func CloneSeviceAccount(clientset *kubernetes.Clientset, sourceNamespace, target
 		annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 		annotations[TARGET_SA_ANNOTATION] = serviceAccount.Name
 
-		_, err = clientset.CoreV1().ServiceAccounts(targetNamespace).Create(context.TODO(), &v1.ServiceAccount{
+		_, err = clientset.CoreV1().ServiceAccounts(targetNamespace).Create(context.TODO(), &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        serviceAccount.Name,
 				Namespace:   targetNamespace,
@@ -767,7 +764,7 @@ func CloneSeviceAccount(clientset *kubernetes.Clientset, sourceNamespace, target
 			if errors.IsNotFound(err) {
 				return &Error{
 					Code:    http.StatusBadRequest,
-					Message: fmt.Sprintf("", serviceAccount.Name, targetNamespace),
+					Message: fmt.Sprint("", serviceAccount.Name, targetNamespace),
 				}
 			} else {
 				return &Error{
@@ -925,7 +922,7 @@ func CloneNamespace(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.D
 	annotations[TARGET_NS_ANNOTATION] = sourceNamespace
 	annotations[TARGET_NS_ANNOTATION_ENABLED] = "true"
 
-	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        targetNamespace,
 			Annotations: annotations,
@@ -934,7 +931,7 @@ func CloneNamespace(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.D
 
 	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
 		errStr := fmt.Sprintf("Error creating namespace %s: %v\n", targetNamespace, err)
-		log.Printf(errStr)
+		log.Print(errStr)
 		return &Error{
 			Code:    http.StatusInternalServerError,
 			Message: errStr,
@@ -942,7 +939,7 @@ func CloneNamespace(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.D
 	}
 
 	// Apply Kube Green Annotations to the entire namespace
-	errObj := applyKubeGreen(clientset, dynamicClientSet, targetNamespace)
+	errObj := applyKubeGreen(dynamicClientSet, targetNamespace)
 	if errObj != nil {
 		// Remove the Target Namespace
 		// TODO: Probably move the namespace deletion to a go routine for returning faster?
@@ -1144,7 +1141,7 @@ func findContainerIndex(deployment *appsv1.Deployment, containerName string) int
 }
 
 // Helper function to apply Kube Green annotations to a namespace
-func applyKubeGreen(clientset *kubernetes.Clientset, dynamicClientSet *dynamic.DynamicClient, clonedNamespace string) *Error {
+func applyKubeGreen(dynamicClientSet *dynamic.DynamicClient, clonedNamespace string) *Error {
 	// Define the SleepInfo CR object
 	name := fmt.Sprintf("%s-sleepinfo", clonedNamespace)
 	unstructuredMap := map[string]interface{}{

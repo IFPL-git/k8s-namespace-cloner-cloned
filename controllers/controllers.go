@@ -11,7 +11,7 @@ import (
 
 	// gin-swagger middleware
 	// swagger embed files
-	"github.com/venkatvghub/k8s-namespace-cloner/managers"
+	"github.com/IFPL-git/k8s-namespace-cloner/managers"
 )
 
 type NSClonerRequestBody struct {
@@ -254,4 +254,19 @@ func UpdateConfigMap(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, "Patched ConfigMap: "+configMapName)
 
+}
+
+// @Summary Get cohorts
+// @Description Get namespaces present in cohort files
+// @Produce json
+// @Success 200 {object} string
+// @Router /cohorts [get]
+func GetCohorts(c *gin.Context) {
+	cohortNamespaces, err := managers.GetCohorts();
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, cohortNamespaces)
 }
