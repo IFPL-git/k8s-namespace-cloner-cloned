@@ -29,6 +29,7 @@ func InitializeRoutes(clientset *kubernetes.Clientset, dynamicClientSet *dynamic
 		v1.POST("/configmaps/:configmap", controllers.UpdateConfigMap)
 
 		v1.GET("/cohorts", controllers.GetCohorts)
+		v1.POST("/cohorts/deployment", controllers.DeployCohort)
 	}
 	// use ginSwagger middleware to serve the API docs
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
