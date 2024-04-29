@@ -38,11 +38,23 @@ type ConfigMapPatchRequestBody struct {
 	//ConfigMapName string            `json:"name"`
 }
 
+type CohortConfig struct {
+	Namespace      string `json:"namespace"`
+	CloneNamespace string `json:"cloneNamespace"`
+	Image          string `json:"image"`
+}
+
+type CohortDeploymentRequestBody struct {
+	CohortFile string         `json:"cohortFile"`
+	Configs    []CohortConfig `json:"configs"`
+}
+
 var (
-	nsRequestBody              NSClonerRequestBody
-	deploymentPatchRequestBody DeploymentPatchRequestBody
-	secretPatchRequestBody     SecretPatchRequestBody
-	configMapPatchRequestBody  ConfigMapPatchRequestBody
+	nsRequestBody               NSClonerRequestBody
+	deploymentPatchRequestBody  DeploymentPatchRequestBody
+	secretPatchRequestBody      SecretPatchRequestBody
+	configMapPatchRequestBody   ConfigMapPatchRequestBody
+	cohortDeploymentRequestBody CohortDeploymentRequestBody
 )
 
 // GetNS godoc
@@ -262,11 +274,59 @@ func UpdateConfigMap(c *gin.Context) {
 // @Success 200 {object} string
 // @Router /cohorts [get]
 func GetCohorts(c *gin.Context) {
-	cohortNamespaces, err := managers.GetCohorts();
+	cohortNamespaces, err := managers.GetCohorts()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Message})
 		return
 	}
 
 	c.JSON(http.StatusOK, cohortNamespaces)
+}
+
+// @Summary Deploy a cohort
+// @Description Clone the namespaces present in the cohort, deploy them and update env host variables
+// @Accept json
+// @Produce json
+// @Param body body CohortDeploymentRequestBody true "Cohort Deployment Request Body"
+// @Success 200 {object} string
+// @Router /cohorts/deployment [post]
+func DeployCohort(c *gin.Context) {
+	if err := c.BindJSON(&cohortDeploymentRequestBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	clientset := c.MustGet("clientset").(*kubernetes.Clientset)
+	dynamicClientSet := c.MustGet("dynamicClientSet").(*dynamic.DynamicClient)
+
+	// Extract environment variables from cohort corresponding to their namespace
+	cohortConfigMap, err := managers.GetCohortConfigMap(cohortDeploymentRequestBody.CohortFile)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Message})
+		return
+	}
+
+	for _, config := range cohortDeploymentRequestBody.Configs {
+		if config.Namespace == config.CloneNamespace {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Source and target namespaces are same for " + config.Namespace})
+			return
+		}
+
+		if err := managers.CloneNamespace(clientset, dynamicClientSet, config.Namespace, config.CloneNamespace); err != nil {
+			c.JSON(err.Code, gin.H{"error": err.Message})
+			return
+		}
+
+		if err := managers.UpdateDeploymentImage(clientset, config.CloneNamespace, config.Image); err != nil {
+			c.JSON(err.Code, gin.H{"error": err.Message})
+			return
+		}
+		
+		if err := managers.UpdateConfigMapHosts(clientset, config.Namespace, config.CloneNamespace, cohortConfigMap[config.Namespace]); err != nil {
+			c.JSON(err.Code, gin.H{"error": err.Message})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": "true"})
 }

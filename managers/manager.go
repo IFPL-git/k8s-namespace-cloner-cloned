@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -64,7 +63,8 @@ type DeploymentContainers struct {
 }
 
 type CohortService struct {
-	Namespace string `yaml:"namespace"`
+	Namespace   string            `yaml:"namespace"`
+	Environment map[string]string `yaml:"environment,omitempty"`
 }
 
 type CohortFile struct {
@@ -349,7 +349,6 @@ func PatchDeploymentImage(clientset *kubernetes.Clientset, namespace string, dep
 }
 
 func PatchSecret(clientset *kubernetes.Clientset, namespace string, secretName string, data map[string]interface{}) *Error {
-
 	secret, err := clientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return &Error{
@@ -455,24 +454,35 @@ func PatchConfigMap(clientset *kubernetes.Clientset, namespace string, configMap
 	return nil
 }
 
-func GetCohorts() (map[string][]string, error) {
+func GetCohorts() (map[string][]string, *Error) {
 	cohortNamespaces := make(map[string][]string)
 
-	cohortsFolder := "./cohorts"
-	err := filepath.Walk(cohortsFolder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	cohortsFolder := "./cohorts/"
+	files, err := os.ReadDir(cohortsFolder)
+	if err != nil {
+		return nil, &Error{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
 		}
+	}
 
-		if !info.IsDir() && (filepath.Ext(info.Name()) == ".yaml" || filepath.Ext(info.Name()) == ".yml") {
-			file, err := os.ReadFile(path)
+	for _, file := range files {
+		if !file.IsDir() && (strings.HasSuffix(file.Name(), ".yaml") || strings.HasSuffix(file.Name(), ".yml")) {
+			filePath := cohortsFolder + file.Name()
+			data, err := os.ReadFile(filePath)
 			if err != nil {
-				return err
+				return nil, &Error{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
+				}
 			}
 
 			var cohortFile CohortFile
-			if err := yaml.Unmarshal(file, &cohortFile); err != nil {
-				return err
+			if err := yaml.Unmarshal(data, &cohortFile); err != nil {
+				return nil, &Error{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
+				}
 			}
 
 			var namespacesInFile []string
@@ -480,16 +490,159 @@ func GetCohorts() (map[string][]string, error) {
 				namespacesInFile = append(namespacesInFile, service.Namespace)
 			}
 
-			filename := strings.Split(filepath.Base(path), ".")[0]
+			filename := strings.Split(file.Name(), ".")[0]
 			cohortNamespaces[filename] = namespacesInFile
 		}
-
-		return nil
-	})
-
-	if err != nil {
-		return cohortNamespaces, err
 	}
 
 	return cohortNamespaces, nil
+}
+
+func GetCohortConfigMap(cohortFilename string) (map[string]map[string]string, *Error) {
+	cohortConfigMap := make(map[string]map[string]string)
+
+	cohortsFolder := "./cohorts/"
+	files, err := os.ReadDir(cohortsFolder)
+	if err != nil {
+		return nil, &Error{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		}
+	}
+
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), cohortFilename) && (strings.HasSuffix(file.Name(), ".yaml") || strings.HasSuffix(file.Name(), ".yml")) {
+			filePath := cohortsFolder + file.Name()
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				return nil, &Error{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
+				}
+			}
+
+			var cohortFile CohortFile
+			if err := yaml.Unmarshal(data, &cohortFile); err != nil {
+				return nil, &Error{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
+				}
+			}
+
+			for _, service := range cohortFile.Services {
+				if _, ok := cohortConfigMap[service.Namespace]; !ok {
+					cohortConfigMap[service.Namespace] = make(map[string]string)
+				}
+
+				for key, value := range service.Environment {
+					cohortConfigMap[service.Namespace][key] = value
+				}
+			}
+
+			return cohortConfigMap, nil
+		}
+	}
+
+	return nil, &Error{
+		Code:    http.StatusInternalServerError,
+		Message: cohortFilename + " cohort file does not exist",
+	}
+}
+
+// Function to update deployment images for all its containers
+func UpdateDeploymentImage(clientset *kubernetes.Clientset, namespace string, image string) *Error {
+	deployments, err := clientset.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return &Error{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		}
+	}
+
+	for _, deployment := range deployments.Items {
+		containers := deployment.Spec.Template.Spec.Containers
+
+		for i := range containers {
+			containers[i].Image = image
+		}
+
+		deployment.Spec.Template.Spec.Containers = containers
+
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			_, err := clientset.AppsV1().Deployments(namespace).Update(context.TODO(), &deployment, metav1.UpdateOptions{})
+			return err
+		})
+		if retryErr != nil {
+			return &Error{
+				Code:    http.StatusInternalServerError,
+				Message: retryErr.Error(),
+			}
+		}
+	}
+
+	return nil
+}
+
+func UpdateConfigMapHosts(clientset *kubernetes.Clientset, namespace string, cloneNamespace string, cohortEnvVars map[string]string) *Error {
+	if len(cohortEnvVars) == 0 {
+		return nil
+	}
+
+	configMaps, err := clientset.CoreV1().ConfigMaps(cloneNamespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return &Error{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		}
+	}
+
+	for _, configMap := range configMaps.Items {
+		data := configMap.Data
+
+		for key := range data {
+			if host, ok := cohortEnvVars[key]; ok {
+				updatedHost := updateHostNamespace(host, namespace, cloneNamespace)
+
+				if updatedHost == "" {
+					return &Error{
+						Code:    http.StatusBadRequest,
+						Message: "Invalid host",
+					}
+				}
+
+				data[key] = updatedHost
+			}
+		}
+
+		configMap.Data = data
+
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			_, err := clientset.CoreV1().ConfigMaps(cloneNamespace).Update(context.TODO(), &configMap, metav1.UpdateOptions{})
+			return err
+		})
+		if retryErr != nil {
+			return &Error{
+				Code:    http.StatusInternalServerError,
+				Message: retryErr.Error(),
+			}
+		}
+	}
+
+	return nil
+}
+
+func updateHostNamespace(host string, oldNamespace string, newNamespace string) string {
+	parts := strings.Split(host, ".")
+
+	if len(parts) < 2 {
+		return host
+	}
+
+	if parts[1] == oldNamespace {
+		parts[1] = newNamespace
+	} else {
+		return ""
+	}
+
+	return strings.Join(parts, ".")
 }
