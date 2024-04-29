@@ -11,4 +11,3 @@ secretData:  # Data for the Secret (base64-encoded)
   secret_key: cGFzc3dvcmQ=
 serviceAccount: 
   name: sample-service-account
-
